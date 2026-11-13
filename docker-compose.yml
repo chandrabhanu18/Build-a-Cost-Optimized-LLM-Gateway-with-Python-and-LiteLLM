@@ -1,0 +1,73 @@
+services:
+  # LLM Gateway FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: llm_gateway_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/llm_gateway
+      - REDIS_URL=redis://redis:6379/0
+      - CONFIG_PATH=config.yaml
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/v1/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Relational Database for Telemetry, Cost Logging & Analytics
+  postgres:
+    image: postgres:16-alpine
+    container_name: llm_gateway_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: llm_gateway
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d llm_gateway" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Redis Stack Server (provides RediSearch module for Vector Similarity Search)
+  redis:
+    image: redis/redis-stack:latest
+    container_name: llm_gateway_redis
+    ports:
+      - "6379:6379"
+      - "8001:8001" # RedisInsight Web UI
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

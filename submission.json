@@ -1,0 +1,6 @@
+{
+  "setup_command": "pip install -r requirements.txt",
+  "test_command": "pytest -v",
+  "start_command": "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+}
+
